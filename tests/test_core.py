@@ -214,6 +214,11 @@ class TidyTests(unittest.TestCase):
         self.assertEqual(len(bgs), 2)
         bg1 = next(e for e in bgs if e["customData"]["section"] == secs[1]["id"])
         self.assertEqual(bg1["y"], secs[1]["y"])
+        # members start below the coloured title
+        for f in secs:
+            mem = [e for e in scene["elements"] if e.get("frameId") == f["id"]
+                   and e.get("customData", {}).get("excalibridge") not in ("section-bg", "section-title")]
+            self.assertGreaterEqual(min(e["y"] for e in mem), f["y"] + layout.TITLE_H + 8 - 0.5)
         # the backdrop sits before the section's members in z-order
         idx = {e["id"]: i for i, e in enumerate(scene["elements"])}
         self.assertLess(idx[bg1["id"]], idx["b"])

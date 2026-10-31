@@ -3,6 +3,11 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.5.1] - 2026-10-31
+
+### Fixed
+- `tidy` now extends a section upward when its content would sit under the coloured title.
+
 ## [0.5.0] - 2026-10-31
 
 ### Added

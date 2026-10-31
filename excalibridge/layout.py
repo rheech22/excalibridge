@@ -285,6 +285,23 @@ def tidy(scene: dict, gap: float = GAP) -> dict:
     for f in secs:
         if _style_section(scene, f):
             styled += 1
+        # Make room for the coloured title: members must start below it.
+        members = [e for e in _live(scene) if e.get("frameId") == f["id"]
+                   and e.get("customData", {}).get("excalibridge") not in ("section-bg", "section-title")]
+        if members:
+            top = min(bounds(e)[1] for e in members)
+            want = f["y"] + TITLE_H + 8
+            if top < want:
+                delta = want - top
+                f["y"] -= delta
+                f["height"] += delta
+                f["version"] = f.get("version", 1) + 1
+                title = next((e for e in _live(scene) if e.get("customData", {}).get("excalibridge") == "section-title"
+                              and e["customData"].get("section") == f["id"]), None)
+                if title is not None:
+                    title["y"] = f["y"] + 12
+                    title["version"] = title.get("version", 1) + 1
+    secs = sorted(sections(scene), key=lambda f: (f["y"], f["x"]))
     for i, f in enumerate(secs):
         fx0, fy0, fx1, fy1 = bounds(f)
         need = fy0
