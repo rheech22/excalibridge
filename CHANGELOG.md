@@ -3,6 +3,17 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.6.0] - 2026-10-31
+
+### Changed
+- The viewer hides Excalidraw's frame outline and name; sections are shown by their backdrop and
+  coloured title only.
+
+### Fixed
+- The viewer no longer overwrites changes made on disk by the agent while it holds unsaved edits.
+  It merges: disk is the base, this tab's added/modified/removed elements are applied on top, and
+  a save first merges whatever is newer on disk.
+
 ## [0.5.1] - 2026-10-31
 
 ### Fixed

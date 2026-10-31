@@ -80,12 +80,13 @@ const refreshServerPending = async () => {
 };
 
 // ---------------------------------------------------------------- load
-let initialData = { elements: [], appState: { viewBackgroundColor: "#ffffff" } };
+const FRAME_RENDERING = { enabled: true, name: false, outline: false, clip: false };
+let initialData = { elements: [], appState: { viewBackgroundColor: "#ffffff", frameRendering: FRAME_RENDERING } };
 if (file) {
   const r = await fetch("/" + file + "?t=" + Date.now());
   if (r.ok) {
     const j = await r.json();
-    initialData = { elements: j.elements || [], appState: { viewBackgroundColor: j.appState?.viewBackgroundColor || "#ffffff" }, scrollToContent: true };
+    initialData = { elements: j.elements || [], appState: { viewBackgroundColor: j.appState?.viewBackgroundColor || "#ffffff", frameRendering: FRAME_RENDERING }, scrollToContent: true };
   } else {
     showError("Could not load " + file + " (" + r.status + "). The server serves the project root; the path is root-relative.");
   }
@@ -109,6 +110,10 @@ window.unsavedChanges = () => diffAgainst(savedSnapshot);
 const refreshMtime = async () => { try { loadedMtime = (await (await fetch(q("mtime"))).json()).mtime; } catch {} };
 
 window.saveScene = async () => {
+  try {
+    const { mtime } = await (await fetch(q("mtime"))).json();
+    if (loadedMtime !== null && mtime !== loadedMtime) { await pollFile(); }
+  } catch {}
   const json = serializeAsJSON(api.getSceneElements(), api.getAppState(), api.getFiles(), "local");
   const r = await fetch(q("save"), { method: "POST", headers: { "Content-Type": "application/json" }, body: json });
   const out = await r.json();
@@ -159,11 +164,21 @@ async function pollFile() {
     if (loadedMtime === null) { loadedMtime = mtime; return; }
     if (mtime === loadedMtime) return;
     if (api.getAppState().editingTextElement) return;
-    if (window.unsavedChanges().count > 0) { pinStatus("File changed on disk; keeping your unsaved edits."); return; }
     const j = await (await fetch("/" + file + "?t=" + Date.now())).json();
-    api.updateScene({ elements: j.elements });
+    const local = window.unsavedChanges();
+    let merged = j.elements;
+    if (local.count > 0) {
+      // Keep this tab's unsaved edits on top of what changed on disk (the agent edits other elements).
+      const mine = new Map([...local.added, ...local.modified].map(e => [e.id, e]));
+      const gone = new Set(local.removed);
+      merged = j.elements.filter(e => !gone.has(e.id)).map(e => mine.has(e.id) ? mine.get(e.id) : e);
+      for (const e of local.added) if (!j.elements.some(x => x.id === e.id)) merged.push(e);
+    }
+    api.updateScene({ elements: merged });
     savedSnapshot = snap(j.elements); loadedMtime = mtime;
-    pinStatus("Reloaded " + new Date().toLocaleTimeString(), 2000); refreshServerPending();
+    pinStatus(local.count > 0 ? "Merged changes from disk with your edits" : "Reloaded " + new Date().toLocaleTimeString(), 2000);
+    refreshServerPending();
+    if (local.count > 0) scheduleAutosave();
   } catch {}
 }
 setInterval(pollFile, 3000);
