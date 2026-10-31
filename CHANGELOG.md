@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.2.1] - 2026-10-31
+
+### Fixed
+- Change detection compared Excalidraw's `version` counter, so text the viewer re-measured after a
+  CLI reply showed up as a user edit. It now compares content and placement (text, position,
+  colours, points, and size for non-text shapes).
+
 ## [0.2.0] - 2026-10-31
 
 ### Added

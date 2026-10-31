@@ -39,11 +39,25 @@ class CoreTests(unittest.TestCase):
         core.write_scene(self.root / self.rel, scene)
         core.mark_seen(self.root, self.rel)
         scene["elements"][0]["version"] += 1
+        scene["elements"][0]["text"] = "x changed"
         scene["elements"][1]["isDeleted"] = True
         core.write_scene(self.root / self.rel, scene)
         d = core.changes_since_seen(self.root, self.rel)
         self.assertEqual([e["id"] for e in d["modified"]], ["e1"])
         self.assertEqual([e["id"] for e in d["removed"]], ["e2"])
+
+    def test_remeasured_text_is_not_a_change(self):
+        scene = core.read_scene(self.root / self.rel)
+        scene["elements"].append(core.text_element("hello", 0, 0, element_id="t"))
+        core.write_scene(self.root / self.rel, scene)
+        core.mark_seen(self.root, self.rel)
+        el = scene["elements"][0]
+        el["version"] += 3; el["width"] += 17.5; el["height"] += 2; el["updated"] += 1000
+        core.write_scene(self.root / self.rel, scene)
+        self.assertEqual(core.changes_since_seen(self.root, self.rel)["count"], 0)
+        el["x"] += 5
+        core.write_scene(self.root / self.rel, scene)
+        self.assertEqual(core.changes_since_seen(self.root, self.rel)["count"], 1)
 
     def test_reply_near_anchor(self):
         scene = core.read_scene(self.root / self.rel)

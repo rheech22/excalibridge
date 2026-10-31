@@ -138,11 +138,22 @@ def brief(e: dict) -> dict:
     return out
 
 
+def _signature(e: dict) -> tuple:
+    """What counts as a meaningful change. Excalidraw bumps `version` for re-measured text,
+    selection nudges, and other noise, so we compare content and placement instead."""
+    sig = [e.get("type"), e.get("text"), round(e.get("x", 0)), round(e.get("y", 0)), e.get("strokeColor"),
+           e.get("backgroundColor"), e.get("containerId"), e.get("strokeStyle"), e.get("opacity"),
+           tuple(tuple(round(v) for v in pt) for pt in e.get("points", []) or [])]
+    if e.get("type") != "text":  # text boxes auto-resize; their size is not a user edit
+        sig += [round(e.get("width", 0)), round(e.get("height", 0))]
+    return tuple(sig)
+
+
 def diff_scenes(seen: dict, now: dict) -> dict:
     a, b = _live(seen), _live(now)
     return {
         "added": [brief(e) for i, e in b.items() if i not in a],
-        "modified": [brief(e) for i, e in b.items() if i in a and a[i].get("version") != e.get("version")],
+        "modified": [brief(e) for i, e in b.items() if i in a and _signature(a[i]) != _signature(e)],
         "removed": [brief(e) for i, e in a.items() if i not in b],
     }
 
