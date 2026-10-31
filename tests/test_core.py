@@ -92,6 +92,15 @@ class QuestionCardTests(unittest.TestCase):
         self.root = Path(tempfile.mkdtemp()); self.rel = "q.excalidraw"
         core.write_scene(self.root / self.rel, core.empty_scene())
 
+    def test_numbering_continues_after_handwritten_headings(self):
+        scene = core.read_scene(self.root / self.rel)
+        scene["elements"].append(core.text_element("Q7 · old topic", 0, 0, color="#1e1e1e"))
+        core.write_scene(self.root / self.rel, scene)
+        q = core.add_question(self.root, self.rel, "next?")
+        self.assertEqual(q["number"], 8)
+        self.assertEqual(core.add_question(self.root, self.rel, "forced", number=20)["number"], 20)
+        self.assertEqual(core.add_question(self.root, self.rel, "after forced")["number"], 21)
+
     def test_ask_numbers_and_answer_detection(self):
         labels = {"answer": "답변: ", "reply": "답: ", "question": "Q"}
         q1 = core.add_question(self.root, self.rel, "first?", title="one", labels=labels)

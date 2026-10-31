@@ -273,20 +273,30 @@ def _wrap(text: str, max_chars: int) -> str:
     return "\n".join(out)
 
 
-def next_question_number(scene: dict) -> int:
+def next_question_number(scene: dict, label: str = "Q") -> int:
+    """One past the highest existing question number, counting both cards made by `ask` and any
+    hand-written heading that starts with the question label and a number (e.g. "Q7 · topic")."""
+    import re
     nums = [int(e["customData"].get("number", 0)) for e in scene.get("elements", [])
             if not e.get("isDeleted") and e.get("customData", {}).get("excalibridge") == "question"]
+    pat = re.compile(rf"^{re.escape(label)}\s*(\d+)\b")
+    for e in scene.get("elements", []):
+        if e.get("type") == "text" and not e.get("isDeleted"):
+            for line in (e.get("text") or "").split("\n"):
+                m = pat.match(line.strip())
+                if m:
+                    nums.append(int(m.group(1)))
     return max(nums, default=0) + 1
 
 
 def add_question(root: Path, rel: str, question: str, *, title: str | None = None, at: tuple[float, float] | None = None,
-                 width: float = 420, labels: dict[str, str] | None = None) -> dict:
+                 width: float = 420, labels: dict[str, str] | None = None, number: int | None = None) -> dict:
     """Append a question card: title, question text, a dashed rule, and an answer line the user
     double-clicks to complete. The answer line is in the user's colour so nothing needs restyling."""
     labels = {**DEFAULT_LABELS, **(labels or {})}
     path = root / rel
     scene = read_scene(path)
-    n = next_question_number(scene)
+    n = number if number is not None else next_question_number(scene, labels["question"])
     heading = f"{labels['question']}{n}" + (f" · {title}" if title else "")
     body = _wrap(question, max(20, int(width / 7.5)))
     body_h = max(30.0, estimate_text_box(body, 12)[1])

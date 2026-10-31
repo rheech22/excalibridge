@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.3.1] - 2026-10-31
+
+### Fixed
+- `ask` numbering now continues after hand-written `Q<n>` headings already on the canvas, and
+  `--number` forces a specific number.
+
 ## [0.3.0] - 2026-10-31
 
 ### Added

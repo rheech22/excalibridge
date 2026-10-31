@@ -130,7 +130,8 @@ def cmd_ask(args):
     cfg = _cfg(args)
     rel = core.rel_path(cfg.root, args.file)
     at = tuple(float(v) for v in args.at.split(",")) if args.at else None
-    _print(core.add_question(cfg.root, rel, args.question, title=args.title, at=at, width=args.width, labels=cfg.labels))
+    _print(core.add_question(cfg.root, rel, args.question, title=args.title, at=at, width=args.width, labels=cfg.labels,
+                             number=args.number))
 
 
 def cmd_seen(args):
@@ -242,6 +243,7 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("ask", help="add a question card with an answer line for the user")
     s.add_argument("file"); s.add_argument("question"); s.add_argument("--title")
     s.add_argument("--at", help="x,y of the card; default: below everything"); s.add_argument("--width", type=float, default=420)
+    s.add_argument("--number", type=int, help="force the question number (default: continue after existing Q<n> headings)")
     s.set_defaults(fn=cmd_ask)
 
     s = sub.add_parser("send", help="simulate the send button (for testing adapters)")
