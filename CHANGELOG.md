@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.2.0] - 2026-10-31
+
+### Added
+- The send button is disabled while there is nothing new for the agent (no unsaved edits and no
+  changes since the agent last marked the file seen). It re-enables as you draw and turns off again
+  once the agent has caught up. Cmd/Ctrl+Shift+Enter still forces a send.
+
 ## [0.1.1] - 2026-10-31
 
 ### Fixed
