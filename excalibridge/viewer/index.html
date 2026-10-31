@@ -54,12 +54,12 @@ const setBusy = (busy) => { const b = document.getElementById("xb-send"); if (b)
 // ---------------------------------------------------------------- load
 let initialData = { elements: [], appState: { viewBackgroundColor: "#ffffff" } };
 if (file) {
-  const r = await fetch(file + "?t=" + Date.now());
+  const r = await fetch("/" + file + "?t=" + Date.now());
   if (r.ok) {
     const j = await r.json();
     initialData = { elements: j.elements || [], appState: { viewBackgroundColor: j.appState?.viewBackgroundColor || "#ffffff" }, scrollToContent: true };
-  } else if (r.status !== 404) {
-    showError("Could not load " + file + " (" + r.status + ")");
+  } else {
+    showError("Could not load " + file + " (" + r.status + "). The server serves the project root; the path is root-relative.");
   }
 }
 
@@ -132,7 +132,7 @@ async function pollFile() {
     if (mtime === loadedMtime) return;
     if (api.getAppState().editingTextElement) return;
     if (window.unsavedChanges().count > 0) { setStatus("File changed on disk; keeping your unsaved edits."); return; }
-    const j = await (await fetch(file + "?t=" + Date.now())).json();
+    const j = await (await fetch("/" + file + "?t=" + Date.now())).json();
     api.updateScene({ elements: j.elements });
     savedSnapshot = snap(j.elements); loadedMtime = mtime;
     setStatus("Reloaded " + new Date().toLocaleTimeString());

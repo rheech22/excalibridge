@@ -3,6 +3,14 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.1.1] - 2026-10-31
+
+### Fixed
+- Viewer fetched the canvas relative to the viewer URL and showed an empty scene; it now fetches
+  from the project root and reports load failures instead of staying silent.
+- `excalibridge serve` passed `--root` after the subcommand when spawning the daemon.
+- Request body parsing in the server (syntax error).
+
 ## [0.1.0] - 2026-10-31
 
 ### Added
