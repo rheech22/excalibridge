@@ -87,6 +87,29 @@ class CoreTests(unittest.TestCase):
         self.assertEqual(oct(cfg.path.stat().st_mode)[-3:], "600")
 
 
+class QuestionCardTests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp()); self.rel = "q.excalidraw"
+        core.write_scene(self.root / self.rel, core.empty_scene())
+
+    def test_ask_numbers_and_answer_detection(self):
+        labels = {"answer": "답변: ", "reply": "답: ", "question": "Q"}
+        q1 = core.add_question(self.root, self.rel, "first?", title="one", labels=labels)
+        q2 = core.add_question(self.root, self.rel, "second?", labels=labels)
+        self.assertEqual((q1["number"], q2["number"]), (1, 2))
+        self.assertGreater(q2["y"], q1["y"] + q1["height"])
+        core.mark_seen(self.root, self.rel)
+        scene = core.read_scene(self.root / self.rel)
+        ans = next(e for e in scene["elements"] if e["id"] == q1["answerId"])
+        ans["text"] = ans["originalText"] = "답변: yes, do it"; ans["version"] += 1
+        core.write_scene(self.root / self.rel, scene)
+        d = core.changes_since_seen(self.root, self.rel, labels)
+        self.assertEqual(len(d["modified"]), 1)
+        m = d["modified"][0]
+        self.assertEqual(m["role"], "answer"); self.assertEqual(m["answer"], "yes, do it")
+        self.assertEqual(m["question"], "one"); self.assertEqual(m["questionId"], q1["id"])
+
+
 class AdapterTests(unittest.TestCase):
     def test_dispatch_isolates_failures(self):
         from excalibridge.adapters import dispatch

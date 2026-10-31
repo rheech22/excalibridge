@@ -19,6 +19,13 @@ and reserve markers for what content cannot say.
 
 Prefixes are authoritative; colours are a hint. Agents must not change the style of the person's elements.
 
+## Question cards
+
+The agent asks with `excalibridge ask`. A card has a numbered title, the question, a dashed rule,
+and one answer line (`Answer: `) in the person's own colour. The person double-clicks that line and
+types after the label; nothing needs restyling. The agent reads the completed line from `changes`
+(`role: "answer"`) and moves settled answers into the documentation.
+
 ## Rhythm
 
 - The person presses **Send** when a batch is ready. The viewer saves first, then notifies.

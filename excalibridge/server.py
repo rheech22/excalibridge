@@ -80,7 +80,7 @@ def make_handler(cfg: core.ProjectConfig):
             if op == "mtime":
                 return self._json({"mtime": os.stat(root / rel).st_mtime})
             if op == "changes":
-                return self._json(core.changes_since_seen(root, rel))
+                return self._json(core.changes_since_seen(root, rel, cfg.labels))
             return self._json({"ok": False, "error": "unknown op"}, 404)
 
         def do_POST(self):

@@ -26,7 +26,10 @@ project root (the git top-level) and opens the viewer. Wake-up adapters are opti
    `excalibridge changes <file>` lists `added`, `modified`, `removed` elements since you last
    marked the file seen. Read only those; the user may have edited anywhere on the canvas.
 3. **Answer on the canvas**: `excalibridge reply <file> --near <element id> "short answer"`
-   puts a blue `A:` line under the element. Apply requests and decisions by editing the file or,
+   puts a blue `A:` line under the element. To ask the user something, use
+   `excalibridge ask <file> "question" --title "topic"`: it adds a numbered question card with an
+   answer line the user completes by double-clicking. In `changes`, a completed answer line comes
+   back with `role: "answer"`, the answer text, and the card it belongs to. Apply requests and decisions by editing the file or,
    when you have a browser tab on the viewer, by scripting `window.excalidrawAPI` there
    (`window.convertToExcalidrawElements` is exposed for labelled shapes) and calling
    `window.saveScene()`.
@@ -44,7 +47,10 @@ Keep replies short. Long reasoning belongs in chat; the canvas points at *where*
 | Discarded | grey text or strikethrough | ignore |
 | Your reply | blue (#1971c2), prefix `A:` | `excalibridge reply` does this |
 
-Prefixes win over colours. Do not restyle the user's elements.
+| Question card | orange card made by `excalibridge ask` | the user completes the `Answer:` line; read it from `changes` |
+
+Prefixes win over colours. Do not restyle the user's elements. Labels (`Answer:`, `A:`, `Q`) can be
+localised per project: `excalibridge config --label answer '답변: ' --label reply '답: '`.
 
 ## Drawing programmatically
 

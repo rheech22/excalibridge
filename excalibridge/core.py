@@ -15,7 +15,10 @@ from typing import Any
 
 HOME = Path(os.environ.get("EXCALIBRIDGE_HOME", Path.home() / ".excalibridge"))
 AGENT_COLOR = "#1971c2"
+USER_COLOR = "#1e1e1e"
+QUESTION_COLOR = "#e67700"
 DEFAULT_PORT = 8765
+DEFAULT_LABELS = {"answer": "Answer: ", "reply": "A: ", "question": "Q"}
 
 
 # --------------------------------------------------------------------------- paths
@@ -67,6 +70,7 @@ class ProjectConfig:
     root: Path
     port: int = DEFAULT_PORT
     notify: list[dict[str, Any]] = field(default_factory=list)
+    labels: dict[str, str] = field(default_factory=lambda: dict(DEFAULT_LABELS))
 
     @property
     def slug(self) -> str:
@@ -83,12 +87,13 @@ class ProjectConfig:
             data = json.loads(cfg.path.read_text())
             cfg.port = int(data.get("port", DEFAULT_PORT))
             cfg.notify = list(data.get("notify", []))
+            cfg.labels = {**DEFAULT_LABELS, **data.get("labels", {})}
         return cfg
 
     def save(self) -> None:
         self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(json.dumps({"root": str(self.root), "port": self.port, "notify": self.notify},
-                                        indent=2) + "\n")
+        self.path.write_text(json.dumps({"root": str(self.root), "port": self.port, "notify": self.notify,
+                                         "labels": self.labels}, ensure_ascii=False, indent=2) + "\n")
         os.chmod(self.path, 0o600)  # notify entries may hold webhook URLs
 
 
@@ -149,20 +154,35 @@ def _signature(e: dict) -> tuple:
     return tuple(sig)
 
 
-def diff_scenes(seen: dict, now: dict) -> dict:
+def diff_scenes(seen: dict, now: dict, labels: dict[str, str] | None = None) -> dict:
     a, b = _live(seen), _live(now)
+    answer = (labels or DEFAULT_LABELS)["answer"].strip()
+    cards = [e for e in b.values() if e.get("customData", {}).get("excalibridge") == "question"]
+
+    def annotate(e: dict) -> dict:
+        out = brief(e)
+        text = (e.get("text") or "").strip()
+        if e.get("type") == "text" and text.startswith(answer):
+            out["role"] = "answer"
+            out["answer"] = text[len(answer):].strip()
+            for c in cards:  # which question card contains this answer line?
+                if c["x"] <= e.get("x", 0) <= c["x"] + c.get("width", 0) and c["y"] <= e.get("y", 0) <= c["y"] + c.get("height", 0):
+                    out["question"] = c["customData"].get("title")
+                    out["questionId"] = c["id"]
+        return out
+
     return {
-        "added": [brief(e) for i, e in b.items() if i not in a],
-        "modified": [brief(e) for i, e in b.items() if i in a and _signature(a[i]) != _signature(e)],
+        "added": [annotate(e) for i, e in b.items() if i not in a],
+        "modified": [annotate(e) for i, e in b.items() if i in a and _signature(a[i]) != _signature(e)],
         "removed": [brief(e) for i, e in a.items() if i not in b],
     }
 
 
-def changes_since_seen(root: Path, rel: str) -> dict:
+def changes_since_seen(root: Path, rel: str, labels: dict[str, str] | None = None) -> dict:
     now = read_scene(root / rel)
     sp = seen_path(root, rel)
     seen = read_scene(sp) if sp.exists() else {"elements": []}
-    d = diff_scenes(seen, now)
+    d = diff_scenes(seen, now, labels)
     d["file"] = rel
     d["count"] = len(d["added"]) + len(d["modified"]) + len(d["removed"])
     return d
@@ -223,6 +243,74 @@ def add_reply(root: Path, rel: str, text: str, *, near: str | None = None, at: t
     scene["elements"].append(el)
     write_scene(path, scene)
     return brief(el)
+
+
+# --------------------------------------------------------------------------- question cards
+
+
+def _base(kind: str, x: float, y: float, w: float, h: float, **extra) -> dict:
+    now_ms = int(time.time() * 1000)
+    el = {"id": _rand_id(), "type": kind, "x": x, "y": y, "width": w, "height": h, "angle": 0,
+          "strokeColor": USER_COLOR, "backgroundColor": "transparent", "fillStyle": "solid", "strokeWidth": 1,
+          "strokeStyle": "solid", "roughness": 1, "opacity": 100, "groupIds": [], "frameId": None,
+          "roundness": None, "seed": random.randint(1, 2**31 - 1), "version": 1,
+          "versionNonce": random.randint(1, 2**31 - 1), "isDeleted": False, "boundElements": [],
+          "updated": now_ms, "link": None, "locked": False}
+    el.update(extra)
+    return el
+
+
+def _wrap(text: str, max_chars: int) -> str:
+    out = []
+    for para in text.split("\n"):
+        line = ""
+        for word in para.split(" "):
+            if line and len(line) + 1 + len(word) > max_chars:
+                out.append(line); line = word
+            else:
+                line = f"{line} {word}" if line else word
+        out.append(line)
+    return "\n".join(out)
+
+
+def next_question_number(scene: dict) -> int:
+    nums = [int(e["customData"].get("number", 0)) for e in scene.get("elements", [])
+            if not e.get("isDeleted") and e.get("customData", {}).get("excalibridge") == "question"]
+    return max(nums, default=0) + 1
+
+
+def add_question(root: Path, rel: str, question: str, *, title: str | None = None, at: tuple[float, float] | None = None,
+                 width: float = 420, labels: dict[str, str] | None = None) -> dict:
+    """Append a question card: title, question text, a dashed rule, and an answer line the user
+    double-clicks to complete. The answer line is in the user's colour so nothing needs restyling."""
+    labels = {**DEFAULT_LABELS, **(labels or {})}
+    path = root / rel
+    scene = read_scene(path)
+    n = next_question_number(scene)
+    heading = f"{labels['question']}{n}" + (f" · {title}" if title else "")
+    body = _wrap(question, max(20, int(width / 7.5)))
+    body_h = max(30.0, estimate_text_box(body, 12)[1])
+    if at is None:
+        live = [e for e in scene["elements"] if not e.get("isDeleted")]
+        bottom = max((e.get("y", 0) + e.get("height", 0) for e in live), default=0)
+        at = (40.0, bottom + 60)
+    x, y = at
+    h = 34 + body_h + 16 + 1 + 12 + 30
+    card = _base("rectangle", x, y, width, h, strokeColor=QUESTION_COLOR, backgroundColor="#fff9db", roundness={"type": 3},
+                 customData={"excalibridge": "question", "number": n, "title": title or "", "question": question})
+    els = [card,
+           text_element(heading, x + 12, y + 10, color=QUESTION_COLOR, font_size=14),
+           text_element(body, x + 12, y + 34, color=USER_COLOR, font_size=12),
+           _base("line", x + 12, y + 34 + body_h + 12, width - 24, 0, strokeColor=QUESTION_COLOR, strokeStyle="dashed",
+                 points=[[0, 0], [width - 24, 0]], lastCommittedPoint=None, startBinding=None, endBinding=None,
+                 startArrowhead=None, endArrowhead=None),
+           text_element(labels["answer"], x + 12, y + 34 + body_h + 24, color=USER_COLOR, font_size=12)]
+    for e in els[1:]:
+        e["seed"] = random.randint(1, 2**31 - 1)
+    scene["elements"].extend(els)
+    write_scene(path, scene)
+    return {"id": card["id"], "number": n, "title": title or "", "x": x, "y": y, "width": width, "height": h,
+            "answerId": els[-1]["id"]}
 
 
 # --------------------------------------------------------------------------- events

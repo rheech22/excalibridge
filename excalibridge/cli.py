@@ -123,7 +123,14 @@ def cmd_open(args):
 
 def cmd_changes(args):
     cfg = _cfg(args)
-    _print(core.changes_since_seen(cfg.root, core.rel_path(cfg.root, args.file)))
+    _print(core.changes_since_seen(cfg.root, core.rel_path(cfg.root, args.file), cfg.labels))
+
+
+def cmd_ask(args):
+    cfg = _cfg(args)
+    rel = core.rel_path(cfg.root, args.file)
+    at = tuple(float(v) for v in args.at.split(",")) if args.at else None
+    _print(core.add_question(cfg.root, rel, args.question, title=args.title, at=at, width=args.width, labels=cfg.labels))
 
 
 def cmd_seen(args):
@@ -137,8 +144,9 @@ def cmd_reply(args):
     cfg = _cfg(args)
     rel = core.rel_path(cfg.root, args.file)
     at = tuple(float(v) for v in args.at.split(",")) if args.at else None
-    out = core.add_reply(cfg.root, rel, args.text, near=args.near, at=at, prefix=args.prefix, color=args.color,
-                         font_size=args.size)
+    out = core.add_reply(cfg.root, rel, args.text, near=args.near, at=at,
+                         prefix=args.prefix if args.prefix is not None else cfg.labels["reply"],
+                         color=args.color, font_size=args.size)
     _print(out)
 
 
@@ -158,10 +166,14 @@ def cmd_send(args):
 
 def cmd_config(args):
     cfg = _cfg(args)
+    changed = False
     if args.port:
-        cfg.port = args.port
+        cfg.port = args.port; changed = True
+    for key, val in (args.label or []):
+        cfg.labels[key] = val; changed = True
+    if changed:
         cfg.save()
-    _print({"root": str(cfg.root), "port": cfg.port, "notify": cfg.notify, "path": str(cfg.path)})
+    _print({"root": str(cfg.root), "port": cfg.port, "notify": cfg.notify, "labels": cfg.labels, "path": str(cfg.path)})
 
 
 def cmd_notify(args):
@@ -224,8 +236,13 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("file"); s.add_argument("text")
     s.add_argument("--near", help="element id to place the reply under")
     s.add_argument("--at", help="x,y coordinates instead of --near")
-    s.add_argument("--prefix", default="A: "); s.add_argument("--color", default=core.AGENT_COLOR)
+    s.add_argument("--prefix", default=None, help="defaults to the project's reply label"); s.add_argument("--color", default=core.AGENT_COLOR)
     s.add_argument("--size", type=int, default=12); s.set_defaults(fn=cmd_reply)
+
+    s = sub.add_parser("ask", help="add a question card with an answer line for the user")
+    s.add_argument("file"); s.add_argument("question"); s.add_argument("--title")
+    s.add_argument("--at", help="x,y of the card; default: below everything"); s.add_argument("--width", type=float, default=420)
+    s.set_defaults(fn=cmd_ask)
 
     s = sub.add_parser("send", help="simulate the send button (for testing adapters)")
     s.add_argument("file"); s.add_argument("--note"); s.set_defaults(fn=cmd_send)
@@ -236,7 +253,10 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("status", help="show server, config, and inbox locations"); s.set_defaults(fn=cmd_status)
 
     s = sub.add_parser("config", help="show or change project config")
-    s.add_argument("--port", type=int); s.set_defaults(fn=cmd_config)
+    s.add_argument("--port", type=int)
+    s.add_argument("--label", nargs=2, action="append", metavar=("KEY", "TEXT"),
+                   help="override a label, e.g. --label answer '답변: ' --label reply '답: '")
+    s.set_defaults(fn=cmd_config)
 
     s = sub.add_parser("notify", help="manage wake-up adapters")
     s.add_argument("action", choices=["list", "add", "remove", "test"])
