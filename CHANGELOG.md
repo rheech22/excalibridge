@@ -3,6 +3,13 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.2.2] - 2026-10-31
+
+### Changed
+- When there is nothing to send, the button stays hoverable and clickable: the tooltip and a click
+  explain why (the agent has seen everything), and Shift+click still forces a send. The status line
+  now reads "Agent is caught up" or "N change(s) to send" instead of the file path.
+
 ## [0.2.1] - 2026-10-31
 
 ### Fixed

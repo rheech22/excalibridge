@@ -13,7 +13,7 @@
     border-radius: 8px; border: 1px solid var(--color-primary, #6965db); background: var(--color-primary, #6965db); color: #fff; cursor: pointer; }
   .xb-ui button:hover { background: var(--color-primary-darker, #5b57d1); }
   .xb-ui button:disabled { opacity: .55; cursor: default; }
-  .xb-ui button.idle { background: var(--island-bg-color, #fff); color: var(--color-gray-50, #999); border-color: var(--default-border-color, #ddd); opacity: 1; }
+  .xb-ui button.idle { background: var(--island-bg-color, #fff); color: var(--color-gray-50, #999); border-color: var(--default-border-color, #ddd); opacity: 1; cursor: help; }
   .xb-ui button svg { width: 18px; height: 18px; display: block; }
   .xb-ui button.busy svg { animation: xb-fly .8s ease-in-out infinite; }
   @keyframes xb-fly { 0%, 100% { transform: translate(0, 0); } 50% { transform: translate(3px, -3px); } }
@@ -52,14 +52,26 @@ let api = null;
 const setStatus = (t) => { const el = document.getElementById("xb-status"); if (el) el.textContent = t; };
 let busyNow = false, serverPending = 0;
 const pendingCount = () => (api ? window.unsavedChanges().count : 0) + serverPending;
+let idleReason = "";
 const renderSendState = () => {
   const b = document.getElementById("xb-send"); if (!b) return;
-  const idle = !busyNow && pendingCount() === 0;
-  b.disabled = busyNow || idle;
+  const unsaved = api ? window.unsavedChanges().count : 0;
+  const idle = !busyNow && unsaved + serverPending === 0;
+  // Keep the button clickable when idle so hovering and clicking can explain why nothing will be sent.
+  b.disabled = busyNow;
+  b.setAttribute("aria-disabled", String(idle));
   b.classList.toggle("busy", busyNow);
   b.classList.toggle("idle", idle);
-  b.title = idle ? "Nothing new for the agent (Cmd/Ctrl+Shift+Enter sends anyway)" : "Send to agent (Cmd/Ctrl+Enter)";
+  idleReason = idle ? "Nothing to send: the agent has already seen everything on this canvas." : "";
+  b.title = busyNow ? "Sending…"
+    : idle ? idleReason + " Draw or write something, or Shift+click to send anyway."
+    : `Send to agent · ${serverPending} change(s) unseen by the agent${unsaved ? `, ${unsaved} unsaved` : ""} (Cmd/Ctrl+Enter)`;
+  if (!busyNow && !statusPinnedUntil || Date.now() > statusPinnedUntil) {
+    setStatus(idle ? "Agent is caught up" : `${serverPending + unsaved} change(s) to send`);
+  }
 };
+let statusPinnedUntil = 0;
+const pinStatus = (t, ms = 4000) => { setStatus(t); statusPinnedUntil = Date.now() + ms; };
 const setBusy = (busy) => { busyNow = busy; renderSendState(); };
 const refreshServerPending = async () => {
   if (!file) return;
@@ -100,28 +112,28 @@ window.saveScene = async () => {
   const json = serializeAsJSON(api.getSceneElements(), api.getAppState(), api.getFiles(), "local");
   const r = await fetch(q("save"), { method: "POST", headers: { "Content-Type": "application/json" }, body: json });
   const out = await r.json();
-  if (out.ok) { savedSnapshot = snap(api.getSceneElements()); await refreshMtime(); setStatus("Saved " + new Date().toLocaleTimeString()); refreshServerPending(); }
+  if (out.ok) { savedSnapshot = snap(api.getSceneElements()); await refreshMtime(); pinStatus("Saved " + new Date().toLocaleTimeString(), 2000); refreshServerPending(); }
   return out;
 };
 
 let sending = false, cooldownUntil = 0;
 window.sendScene = async (note = "", { force = false } = {}) => {
   if (sending) return { ok: false, skipped: "sending" };
-  if (!force && Date.now() < cooldownUntil) { setStatus("Just sent. Wait a moment."); return { ok: false, skipped: "cooldown" }; }
+  if (!force && Date.now() < cooldownUntil) { pinStatus("Just sent. Wait a moment."); return { ok: false, skipped: "cooldown" }; }
   sending = true; setBusy(true);
   try {
     clearTimeout(autosaveTimer);
     if (window.unsavedChanges().count > 0) await window.saveScene();
     let changes = 0;
     try { changes = (await (await fetch(q("changes"))).json()).count || 0; } catch {}
-    if (!force && changes === 0 && !note) { setStatus("Nothing new for the agent. Shift+click to send anyway."); return { ok: false, skipped: "nochange" }; }
+    if (!force && changes === 0 && !note) { pinStatus("Nothing new for the agent. Shift+click to send anyway."); return { ok: false, skipped: "nochange" }; }
     const scene = JSON.parse(serializeAsJSON(api.getSceneElements(), api.getAppState(), api.getFiles(), "local"));
     const r = await fetch(q("send"), { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ scene, note, changes }) });
     const out = await r.json();
     if (out.ok) {
       savedSnapshot = snap(api.getSceneElements()); await refreshMtime(); cooldownUntil = Date.now() + 8000; serverPending = 0; renderSendState();
       const failed = (out.results || []).filter(x => !x.ok && x.type !== "inbox").map(x => x.type);
-      setStatus("Sent " + new Date().toLocaleTimeString() + " (" + changes + " changed)" + (failed.length ? " · failed: " + failed.join(", ") : ""));
+      pinStatus("Sent " + new Date().toLocaleTimeString() + " (" + changes + " changed)" + (failed.length ? " · failed: " + failed.join(", ") : ""), 6000);
     }
     return out;
   } finally { sending = false; setBusy(false); }
@@ -136,7 +148,7 @@ const scheduleAutosave = () => {
     if (!api) return;
     if (api.getAppState().editingTextElement) return scheduleAutosave();
     if (window.unsavedChanges().count === 0) return;
-    try { await window.saveScene(); } catch (e) { setStatus("Autosave failed: " + e); }
+    try { await window.saveScene(); } catch (e) { pinStatus("Autosave failed: " + e, 8000); }
   }, 1500);
 };
 
@@ -147,11 +159,11 @@ async function pollFile() {
     if (loadedMtime === null) { loadedMtime = mtime; return; }
     if (mtime === loadedMtime) return;
     if (api.getAppState().editingTextElement) return;
-    if (window.unsavedChanges().count > 0) { setStatus("File changed on disk; keeping your unsaved edits."); return; }
+    if (window.unsavedChanges().count > 0) { pinStatus("File changed on disk; keeping your unsaved edits."); return; }
     const j = await (await fetch("/" + file + "?t=" + Date.now())).json();
     api.updateScene({ elements: j.elements });
     savedSnapshot = snap(j.elements); loadedMtime = mtime;
-    setStatus("Reloaded " + new Date().toLocaleTimeString()); refreshServerPending();
+    pinStatus("Reloaded " + new Date().toLocaleTimeString(), 2000); refreshServerPending();
   } catch {}
 }
 setInterval(pollFile, 3000);
@@ -161,7 +173,8 @@ setInterval(refreshServerPending, 3000);
 const TopRightUI = () => React.createElement("div", { className: "xb-ui" },
   React.createElement("span", { id: "xb-status", className: "status" }, file || "no file"),
   React.createElement("button", { id: "xb-send", title: "Send to agent (Cmd/Ctrl+Enter; Shift+click forces)", "aria-label": "Send",
-      onClick: (e) => window.sendScene("", { force: e.shiftKey }).catch(err => setStatus("Send failed: " + err)) },
+      onClick: (e) => { if (idleReason && !e.shiftKey) { pinStatus(idleReason + " Shift+click sends anyway."); return; }
+                        window.sendScene("", { force: e.shiftKey }).catch(err => pinStatus("Send failed: " + err)); } },
     React.createElement("svg", { viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: 2, strokeLinecap: "round", strokeLinejoin: "round" },
       React.createElement("path", { d: "M22 2L11 13" }),
       React.createElement("path", { d: "M22 2L15 22L11 13L2 9L22 2Z" }))));
@@ -176,7 +189,7 @@ createRoot(document.getElementById("app")).render(React.createElement(Excalidraw
   initialData,
   renderTopRightUI: () => React.createElement(TopRightUI),
   excalidrawAPI: (a) => { api = a; window.excalidrawAPI = a; savedSnapshot = snap(initialData.elements || []); document.title = "excalibridge · " + file; refreshMtime(); refreshServerPending(); },
-  onChange: () => { if (!api) return; const n = window.unsavedChanges().count; if (n > 0) { setStatus(n + " unsaved change(s), autosaving…"); scheduleAutosave(); } renderSendState(); },
+  onChange: () => { if (!api) return; const n = window.unsavedChanges().count; if (n > 0) scheduleAutosave(); renderSendState(); },
 }));
 </script>
 </body>
