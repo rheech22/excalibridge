@@ -66,7 +66,8 @@ class CoreTests(unittest.TestCase):
         out = core.add_reply(self.root, self.rel, "because", near="q")
         self.assertEqual(out["color"], core.AGENT_COLOR)
         self.assertTrue(out["text"].startswith("A: "))
-        self.assertEqual(out["x"], 100)
+        self.assertEqual(out["mode"], "callout")
+        self.assertEqual(out["x"], 112)  # 12px inside the callout box that starts at the anchor's x
         self.assertGreater(out["y"], 200)
         with self.assertRaises(ValueError):
             core.add_reply(self.root, self.rel, "x", near="missing")
@@ -133,3 +134,60 @@ class AdapterTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class LayoutTests(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp()); self.rel = "l.excalidraw"
+        core.write_scene(self.root / self.rel, core.empty_scene())
+
+    def test_wrap_respects_width(self):
+        from excalibridge import layout
+        out = layout.wrap("가나다라마바사아자차카타파하 " * 4, 200, 12)
+        self.assertTrue(all(sum(12 * (1.0 if ord(c) > 0x2E7F else 0.58) for c in l) <= 200 + 12 for l in out.split("\n")))
+        self.assertGreater(out.count("\n"), 1)
+
+    def test_sections_flow_right_then_wrap(self):
+        a = core.add_section(self.root, self.rel, "A", width=900)
+        b = core.add_section(self.root, self.rel, "B", width=900)
+        c = core.add_section(self.root, self.rel, "C", width=900)
+        self.assertEqual(b["y"], a["y"]); self.assertGreater(b["x"], a["x"] + 800)
+        self.assertEqual(c["x"], 40.0); self.assertGreater(c["y"], a["y"] + a["height"])
+        self.assertEqual((a["index"], b["index"], c["index"]), (1, 2, 3))
+
+    def test_ask_goes_into_latest_section_and_grows_it(self):
+        core.add_section(self.root, self.rel, "S", width=600, height=120)
+        q1 = core.add_question(self.root, self.rel, "one?")
+        q2 = core.add_question(self.root, self.rel, "two?")
+        scene = core.read_scene(self.root / self.rel)
+        fr = next(e for e in scene["elements"] if e["type"] == "frame")
+        self.assertEqual(q1["section"], 1)
+        self.assertGreater(q2["y"], q1["y"] + q1["height"])
+        self.assertGreaterEqual(fr["y"] + fr["height"], q2["y"] + q2["height"])
+        card = next(e for e in scene["elements"] if e["id"] == q2["id"])
+        self.assertEqual(card["frameId"], fr["id"])
+
+    def test_card_reply_grows_card_and_pushes_below(self):
+        q = core.add_question(self.root, self.rel, "why?")
+        scene = core.read_scene(self.root / self.rel)
+        below = core.text_element("below", q["x"], q["y"] + q["height"] + 10, element_id="below")
+        scene["elements"].append(below); core.write_scene(self.root / self.rel, scene)
+        out = core.add_reply(self.root, self.rel, "because " * 30, near=q["answerId"])
+        self.assertEqual(out["mode"], "card")
+        scene = core.read_scene(self.root / self.rel)
+        card = next(e for e in scene["elements"] if e["id"] == q["id"])
+        moved = next(e for e in scene["elements"] if e["id"] == "below")
+        self.assertGreater(card["height"], q["height"])
+        self.assertGreater(moved["y"], q["y"] + q["height"] + 10)
+        self.assertGreaterEqual(moved["y"], card["y"] + card["height"])
+        self.assertIn("\n", out["text"])  # wrapped
+
+    def test_free_reply_is_callout_under_anchor(self):
+        scene = core.read_scene(self.root / self.rel)
+        note = core.text_element("a note", 100, 100, element_id="note"); note["width"] = 200
+        scene["elements"].append(note); core.write_scene(self.root / self.rel, scene)
+        out = core.add_reply(self.root, self.rel, "ok", near="note")
+        self.assertEqual(out["mode"], "callout")
+        scene = core.read_scene(self.root / self.rel)
+        box = next(e for e in scene["elements"] if e["type"] == "rectangle")
+        self.assertEqual(box["x"], 100); self.assertGreater(box["y"], 100)

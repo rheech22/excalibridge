@@ -131,7 +131,15 @@ def cmd_ask(args):
     rel = core.rel_path(cfg.root, args.file)
     at = tuple(float(v) for v in args.at.split(",")) if args.at else None
     _print(core.add_question(cfg.root, rel, args.question, title=args.title, at=at, width=args.width, labels=cfg.labels,
-                             number=args.number))
+                             number=args.number, section=args.section))
+
+
+def cmd_section(args):
+    cfg = _cfg(args)
+    rel = core.rel_path(cfg.root, args.file)
+    at = tuple(float(v) for v in args.at.split(",")) if args.at else None
+    wrap_y = tuple(float(v) for v in args.wrap_y.split(",")) if args.wrap_y else None
+    _print(core.add_section(cfg.root, rel, args.title, width=args.width, height=args.height, at=at, wrap_y=wrap_y))
 
 
 def cmd_seen(args):
@@ -244,7 +252,15 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("file"); s.add_argument("question"); s.add_argument("--title")
     s.add_argument("--at", help="x,y of the card; default: below everything"); s.add_argument("--width", type=float, default=420)
     s.add_argument("--number", type=int, help="force the question number (default: continue after existing Q<n> headings)")
+    s.add_argument("--section", type=int, help="section index to place the card in (default: the latest section)")
     s.set_defaults(fn=cmd_ask)
+
+    s = sub.add_parser("section", help="add a titled section (Excalidraw frame); new cards go into the latest section")
+    s.add_argument("file"); s.add_argument("title")
+    s.add_argument("--width", type=float, default=900); s.add_argument("--height", type=float, default=260)
+    s.add_argument("--at", help="x,y; default: right of the last section, wrapping to a new row past the canvas width")
+    s.add_argument("--wrap-y", help="y0,y1: wrap the existing elements whose top is in this range instead of placing a new empty section")
+    s.set_defaults(fn=cmd_section)
 
     s = sub.add_parser("send", help="simulate the send button (for testing adapters)")
     s.add_argument("file"); s.add_argument("--note"); s.set_defaults(fn=cmd_send)

@@ -228,21 +228,26 @@ def text_element(text: str, x: float, y: float, *, color: str = AGENT_COLOR, fon
 
 def add_reply(root: Path, rel: str, text: str, *, near: str | None = None, at: tuple[float, float] | None = None,
               prefix: str = "A: ", color: str = AGENT_COLOR, font_size: int = 12) -> dict:
-    """Append an agent reply (blue text) below `near` element or at explicit coordinates."""
+    """Agent reply. Near a question card it extends the card; near anything else it adds a callout box
+    under it; with explicit coordinates it is a plain wrapped text. Things below are pushed down."""
+    from excalibridge import layout
     path = root / rel
     scene = read_scene(path)
-    if at is None:
-        if near is None:
-            raise ValueError("pass near=<element id> or at=(x, y)")
-        anchor = next((e for e in scene["elements"] if e["id"] == near and not e.get("isDeleted")), None)
-        if anchor is None:
-            raise ValueError(f"element {near} not found in {rel}")
-        at = (anchor["x"], anchor["y"] + anchor.get("height", 20) + 8)
-    el = text_element(prefix + text if prefix and not text.startswith(prefix) else text, at[0], at[1],
-                      color=color, font_size=font_size)
-    scene["elements"].append(el)
+    body = prefix + text if prefix and not text.startswith(prefix) else text
+    if at is not None:
+        el = text_element(layout.wrap(body, 480, font_size), at[0], at[1], color=color, font_size=font_size)
+        scene["elements"].append(el)
+        write_scene(path, scene)
+        return brief(el)
+    if near is None:
+        raise ValueError("pass near=<element id> or at=(x, y)")
+    anchor = next((e for e in scene["elements"] if e["id"] == near and not e.get("isDeleted")), None)
+    if anchor is None:
+        raise ValueError(f"element {near} not found in {rel}")
+    new = layout.reply_near(scene, anchor, body, color=color, font_size=font_size)
     write_scene(path, scene)
-    return brief(el)
+    txt = next(e for e in new if e["type"] == "text")
+    return {**brief(txt), "mode": "card" if layout._question_card_for(scene, anchor) else "callout"}
 
 
 # --------------------------------------------------------------------------- question cards
@@ -290,20 +295,21 @@ def next_question_number(scene: dict, label: str = "Q") -> int:
 
 
 def add_question(root: Path, rel: str, question: str, *, title: str | None = None, at: tuple[float, float] | None = None,
-                 width: float = 420, labels: dict[str, str] | None = None, number: int | None = None) -> dict:
+                 width: float = 420, labels: dict[str, str] | None = None, number: int | None = None,
+                 section: int | None = None) -> dict:
     """Append a question card: title, question text, a dashed rule, and an answer line the user
     double-clicks to complete. The answer line is in the user's colour so nothing needs restyling."""
+    from excalibridge import layout
     labels = {**DEFAULT_LABELS, **(labels or {})}
     path = root / rel
     scene = read_scene(path)
     n = number if number is not None else next_question_number(scene, labels["question"])
     heading = f"{labels['question']}{n}" + (f" · {title}" if title else "")
-    body = _wrap(question, max(20, int(width / 7.5)))
+    body = layout.wrap(question, width - 24, 12)
     body_h = max(30.0, estimate_text_box(body, 12)[1])
+    frame = layout.current_section(scene, section)
     if at is None:
-        live = [e for e in scene["elements"] if not e.get("isDeleted")]
-        bottom = max((e.get("y", 0) + e.get("height", 0) for e in live), default=0)
-        at = (40.0, bottom + 60)
+        at = layout.place_in_section(scene, frame, width)
     x, y = at
     h = 34 + body_h + 16 + 1 + 12 + 30
     card = _base("rectangle", x, y, width, h, strokeColor=QUESTION_COLOR, backgroundColor="#fff9db", roundness={"type": 3},
@@ -318,9 +324,21 @@ def add_question(root: Path, rel: str, question: str, *, title: str | None = Non
     for e in els[1:]:
         e["seed"] = random.randint(1, 2**31 - 1)
     scene["elements"].extend(els)
+    layout.adopt(scene, frame, els)
     write_scene(path, scene)
     return {"id": card["id"], "number": n, "title": title or "", "x": x, "y": y, "width": width, "height": h,
-            "answerId": els[-1]["id"]}
+            "answerId": els[-1]["id"], "section": int(frame["customData"]["index"]) if frame else None}
+
+
+def add_section(root: Path, rel: str, title: str, *, width: float = 900, height: float = 260,
+                at: tuple[float, float] | None = None, wrap_y: tuple[float, float] | None = None) -> dict:
+    from excalibridge import layout
+    path = root / rel
+    scene = read_scene(path)
+    fr = layout.add_section(scene, title, width=width, height=height, at=at, wrap_y=wrap_y)
+    write_scene(path, scene)
+    return {"id": fr["id"], "index": fr["customData"]["index"], "title": title, "x": fr["x"], "y": fr["y"],
+            "width": fr["width"], "height": fr["height"]}
 
 
 # --------------------------------------------------------------------------- events

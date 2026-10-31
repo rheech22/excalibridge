@@ -26,6 +26,13 @@ and one answer line (`Answer: `) in the person's own colour. The person double-c
 types after the label; nothing needs restyling. The agent reads the completed line from `changes`
 (`role: "answer"`) and moves settled answers into the documentation.
 
+## Layout
+
+- One topic per section (an Excalidraw frame with a title). Sections sit side by side and wrap to
+  the next row, instead of one ever-growing column.
+- Agent replies never float: inside a question card they extend the card; elsewhere they are a
+  callout box directly under the element they answer. Content below is pushed down.
+
 ## Rhythm
 
 - The person presses **Send** when a batch is ready. The viewer saves first, then notifies.

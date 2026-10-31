@@ -25,8 +25,10 @@ project root (the git top-level) and opens the viewer. Wake-up adapters are opti
 2. **When woken** (a send event, or the user says "look at the canvas"):
    `excalibridge changes <file>` lists `added`, `modified`, `removed` elements since you last
    marked the file seen. Read only those; the user may have edited anywhere on the canvas.
-3. **Answer on the canvas**: `excalibridge reply <file> --near <element id> "short answer"`
-   puts a blue `A:` line under the element. To ask the user something, use
+3. **Answer on the canvas**: `excalibridge reply <file> --near <element id> "short answer"`.
+   Near a question card the reply becomes a blue block inside the card (the card grows); near
+   anything else it becomes a blue callout box under that element. Text is wrapped and whatever
+   lies below is pushed down, so nothing overlaps. To ask the user something, use
    `excalibridge ask <file> "question" --title "topic"`: it adds a numbered question card with an
    answer line the user completes by double-clicking. In `changes`, a completed answer line comes
    back with `role: "answer"`, the answer text, and the card it belongs to. Apply requests and decisions by editing the file or,
@@ -37,6 +39,13 @@ project root (the git top-level) and opens the viewer. Wake-up adapters are opti
 5. **Report briefly** in chat: what you read, what you did. One sentence if nothing changed.
 
 Keep replies short. Long reasoning belongs in chat; the canvas points at *where* a remark applies.
+
+## Sections
+
+Group a topic with `excalibridge section <file> "title"`. Sections are Excalidraw frames; new
+question cards go into the latest section and the section grows to fit. Sections flow to the right
+and wrap to a new row past the canvas width, so the board does not become one long column. Wrap
+existing content with `--wrap-y y0,y1`.
 
 ## Notation (see references/protocol.md)
 

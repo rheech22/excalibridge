@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.4.0] - 2026-10-31
+
+### Added
+- Sections: `excalibridge section <file> "title"` adds a titled Excalidraw frame. New question
+  cards land in the latest section, which grows to fit; sections flow to the right and wrap to a
+  new row past the canvas width. `--wrap-y` wraps existing content.
+- Replies are laid out instead of dropped as a single line: inside a question card they become a
+  blue block that extends the card; elsewhere a blue callout box directly under the element.
+  Text is wrapped to the available width and anything below is pushed down.
+
 ## [0.3.1] - 2026-10-31
 
 ### Fixed
