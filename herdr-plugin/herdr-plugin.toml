@@ -1,0 +1,15 @@
+id = "excalibridge"
+name = "excalibridge"
+version = "0.1.0"
+min_herdr_version = "0.8.0"
+description = "Open a shared Excalidraw canvas for the focused pane's project and wire its send button to the focused agent."
+platforms = ["linux", "macos"]
+
+# Opens (creating if needed) docs/diagrams/canvas.excalidraw in the focused pane's project and
+# registers the focused agent as the herdr wake-up target for that project.
+[[actions]]
+id = "open"
+title = "excalibridge: open canvas here"
+description = "Start the canvas server for this project and open the viewer in the browser."
+contexts = ["workspace", "pane"]
+command = ["bash", "scripts/open.sh"]
