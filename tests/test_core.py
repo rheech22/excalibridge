@@ -191,3 +191,29 @@ class LayoutTests(unittest.TestCase):
         scene = core.read_scene(self.root / self.rel)
         box = next(e for e in scene["elements"] if e["type"] == "rectangle")
         self.assertEqual(box["x"], 100); self.assertGreater(box["y"], 100)
+
+
+class TidyTests(unittest.TestCase):
+    def test_tidy_spaces_overlapping_sections_and_styles_them(self):
+        from excalibridge import layout
+        root = Path(tempfile.mkdtemp()); rel = "t.excalidraw"
+        core.write_scene(root / rel, core.empty_scene())
+        scene = core.read_scene(root / rel)
+        a = core.text_element("a", 0, 0, element_id="a"); a["height"] = 100
+        b = core.text_element("b", 0, 90, element_id="b"); b["height"] = 100
+        scene["elements"] += [a, b]
+        core.write_scene(root / rel, scene)
+        core.add_section(root, rel, "A", wrap_y=(0, 50))
+        core.add_section(root, rel, "B", wrap_y=(50, 150))
+        rep = core.tidy(root, rel)
+        scene = core.read_scene(root / rel)
+        secs = sorted(layout.sections(scene), key=lambda f: f["y"])
+        self.assertEqual(rep["sections"], 2)
+        self.assertGreaterEqual(secs[1]["y"], secs[0]["y"] + secs[0]["height"] + layout.GAP - 0.5)
+        bgs = [e for e in scene["elements"] if e.get("customData", {}).get("excalibridge") == "section-bg"]
+        self.assertEqual(len(bgs), 2)
+        bg1 = next(e for e in bgs if e["customData"]["section"] == secs[1]["id"])
+        self.assertEqual(bg1["y"], secs[1]["y"])
+        # the backdrop sits before the section's members in z-order
+        idx = {e["id"]: i for i, e in enumerate(scene["elements"])}
+        self.assertLess(idx[bg1["id"]], idx["b"])

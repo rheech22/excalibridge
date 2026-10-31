@@ -11,6 +11,15 @@ from excalibridge import core
 GAP = 60            # between sections
 PAD = 24            # inside a section
 CANVAS_WIDTH = 2000  # sections flow to the right until this, then wrap to a new row
+TITLE_H = 44         # room for the coloured title inside a section
+
+# (background, accent) pairs cycled by section index
+PALETTE = [("#fff4e6", "#e8590c"), ("#e7f5ff", "#1971c2"), ("#ebfbee", "#2f9e44"), ("#f3f0ff", "#6741d9"),
+           ("#fff9db", "#e67700"), ("#ffe3e3", "#c92a2a"), ("#e3fafc", "#0c8599"), ("#f8f0fc", "#9c36b5")]
+
+
+def palette(index: int) -> tuple[str, str]:
+    return PALETTE[(int(index) - 1) % len(PALETTE)]
 
 
 # ----------------------------------------------------------------------------- geometry
@@ -38,7 +47,7 @@ def push_down(scene: dict, threshold_y: float, x0: float, x1: float, dy: float, 
         ex0, ey0, ex1, ey1 = bounds(e)
         if not (ex0 < x1 and ex1 > x0):
             continue
-        if e["type"] == "frame":
+        if e["type"] == "frame" or e.get("customData", {}).get("excalibridge") == "section-bg":
             if ey0 >= threshold_y - 0.5:
                 e["y"] += dy
             elif ey1 >= threshold_y - 0.5:
@@ -104,6 +113,37 @@ def _frame(title: str, x: float, y: float, w: float, h: float, index: int) -> di
     }
 
 
+def _section_bg(scene: dict, frame: dict) -> dict | None:
+    return next((e for e in _live(scene) if e.get("customData", {}).get("excalibridge") == "section-bg"
+                 and e["customData"].get("section") == frame["id"]), None)
+
+
+def _style_section(scene: dict, frame: dict) -> list[dict]:
+    """Ensure the section has a pastel backdrop (behind its members) and a coloured title."""
+    if _section_bg(scene, frame) is not None:
+        return []
+    bg_color, accent = palette(frame["customData"].get("index", 1))
+    bg = core._base("rectangle", frame["x"], frame["y"], frame["width"], frame["height"], strokeColor=accent,
+                    backgroundColor=bg_color, roundness={"type": 3}, strokeWidth=1, opacity=100,
+                    customData={"excalibridge": "section-bg", "section": frame["id"]})
+    title = core.text_element(frame["name"], frame["x"] + 16, frame["y"] + 12, color=accent, font_size=18)
+    title["customData"] = {"excalibridge": "section-title", "section": frame["id"]}
+    for e in (bg, title):
+        e["frameId"] = frame["id"]
+    # z-order: the backdrop must come before every member of the frame
+    members = [i for i, e in enumerate(scene["elements"]) if e.get("frameId") == frame["id"]]
+    pos = min(members) if members else len(scene["elements"])
+    scene["elements"][pos:pos] = [bg, title]
+    return [bg, title]
+
+
+def _sync_bg(scene: dict, frame: dict) -> None:
+    bg = _section_bg(scene, frame)
+    if bg is not None:
+        bg["x"], bg["y"], bg["width"], bg["height"] = frame["x"], frame["y"], frame["width"], frame["height"]
+        bg["version"] = bg.get("version", 1) + 1
+
+
 def add_section(scene: dict, title: str, *, width: float = 900, height: float = 260, at: tuple[float, float] | None = None,
                 wrap_y: tuple[float, float] | None = None, canvas_width: float = CANVAS_WIDTH) -> dict:
     """Add a titled frame. With `wrap_y`, wrap the existing elements whose top lies in that y-range (no moving).
@@ -117,7 +157,7 @@ def add_section(scene: dict, title: str, *, width: float = 900, height: float = 
             raise ValueError("no elements in that y-range")
         xs0 = min(bounds(e)[0] for e in inside); ys0 = min(bounds(e)[1] for e in inside)
         xs1 = max(bounds(e)[2] for e in inside); ys1 = max(bounds(e)[3] for e in inside)
-        fr = _frame(title, xs0 - PAD, ys0 - PAD, xs1 - xs0 + 2 * PAD, ys1 - ys0 + 2 * PAD, index)
+        fr = _frame(title, xs0 - PAD, ys0 - PAD - TITLE_H, xs1 - xs0 + 2 * PAD, ys1 - ys0 + 2 * PAD + TITLE_H, index)
         for e in inside:
             e["frameId"] = fr["id"]
     else:
@@ -132,6 +172,7 @@ def add_section(scene: dict, title: str, *, width: float = 900, height: float = 
                 x, y = 40.0, max(bounds(s)[3] for s in secs) + GAP
         fr = _frame(title, x, y, width, height, index)
     scene["elements"].append(fr)
+    _style_section(scene, fr)
     return fr
 
 
@@ -143,9 +184,12 @@ def _grow_section_to_fit(scene: dict, frame: dict | None, needed_bottom: float) 
     cur = frame["y"] + frame["height"]
     if want > cur:
         dy = want - cur
-        push_down(scene, cur + 1, frame["x"], frame["x"] + frame["width"], dy, exclude={frame["id"]})
+        bg = _section_bg(scene, frame)
+        push_down(scene, cur + 1, frame["x"], frame["x"] + frame["width"], dy,
+                  exclude={frame["id"]} | ({bg["id"]} if bg else set()))
         frame["height"] += dy
         frame["version"] = frame.get("version", 1) + 1
+        _sync_bg(scene, frame)
 
 
 def place_in_section(scene: dict, frame: dict | None, width: float) -> tuple[float, float]:
@@ -154,7 +198,8 @@ def place_in_section(scene: dict, frame: dict | None, width: float) -> tuple[flo
     if frame is None:
         return 40.0, content_bottom(live) + GAP if live else 40.0
     members = [e for e in live if e.get("frameId") == frame["id"]]
-    y = (content_bottom(members) + PAD) if members else frame["y"] + 48
+    members = [e for e in members if e.get("customData", {}).get("excalibridge") not in ("section-bg", "section-title")]
+    y = (content_bottom(members) + PAD) if members else frame["y"] + TITLE_H + 12
     return frame["x"] + PAD, y
 
 
@@ -226,3 +271,36 @@ def reply_near(scene: dict, anchor: dict, text: str, *, color: str = core.AGENT_
     if frame is not None:
         _grow_section_to_fit(scene, frame, max(bounds(e)[3] for e in new))
     return new
+
+
+# ----------------------------------------------------------------------------- tidy
+
+
+def tidy(scene: dict, gap: float = GAP) -> dict:
+    """Enforce a minimum vertical gap between stacked sections, make sure every section is styled,
+    and keep backdrops in sync. Members move with their section. Returns a small report."""
+    moved = 0
+    styled = 0
+    secs = sorted(sections(scene), key=lambda f: (f["y"], f["x"]))
+    for f in secs:
+        if _style_section(scene, f):
+            styled += 1
+    for i, f in enumerate(secs):
+        fx0, fy0, fx1, fy1 = bounds(f)
+        need = fy0
+        for prev in secs[:i]:
+            px0, py0, px1, py1 = bounds(prev)
+            if px0 < fx1 and px1 > fx0:  # same column
+                need = max(need, py1 + gap)
+        if need > fy0 + 0.5:
+            dy = need - fy0
+            for e in _live(scene):
+                if e.get("frameId") == f["id"]:
+                    e["y"] += dy
+                    e["version"] = e.get("version", 1) + 1
+            f["y"] += dy
+            f["version"] = f.get("version", 1) + 1
+            moved += 1
+    for f in secs:
+        _sync_bg(scene, f)
+    return {"sections": len(secs), "moved": moved, "styled": styled}

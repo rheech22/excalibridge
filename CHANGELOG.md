@@ -3,6 +3,16 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.5.0] - 2026-10-31
+
+### Added
+- Sections get a pastel backdrop and a coloured title from a cycling palette, so topics read at a glance.
+- `excalibridge tidy <file>`: enforce a minimum gap between stacked sections, (re)apply section
+  styling, and keep backdrops in sync. Members move with their section.
+
+### Changed
+- Wrapped sections reserve room for the title above the wrapped content.
+
 ## [0.4.0] - 2026-10-31
 
 ### Added

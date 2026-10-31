@@ -134,6 +134,11 @@ def cmd_ask(args):
                              number=args.number, section=args.section))
 
 
+def cmd_tidy(args):
+    cfg = _cfg(args)
+    _print(core.tidy(cfg.root, core.rel_path(cfg.root, args.file)))
+
+
 def cmd_section(args):
     cfg = _cfg(args)
     rel = core.rel_path(cfg.root, args.file)
@@ -255,11 +260,14 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--section", type=int, help="section index to place the card in (default: the latest section)")
     s.set_defaults(fn=cmd_ask)
 
+    s = sub.add_parser("tidy", help="space stacked sections apart and (re)apply section styling")
+    s.add_argument("file"); s.set_defaults(fn=cmd_tidy)
+
     s = sub.add_parser("section", help="add a titled section (Excalidraw frame); new cards go into the latest section")
     s.add_argument("file"); s.add_argument("title")
     s.add_argument("--width", type=float, default=900); s.add_argument("--height", type=float, default=260)
     s.add_argument("--at", help="x,y; default: right of the last section, wrapping to a new row past the canvas width")
-    s.add_argument("--wrap-y", help="y0,y1: wrap the existing elements whose top is in this range instead of placing a new empty section")
+    s.add_argument("--wrap-y", help="y0,y1: wrap the existing elements whose top is in this range instead of placing a new empty section (write --wrap-y=-30,790 for a negative start)")
     s.set_defaults(fn=cmd_section)
 
     s = sub.add_parser("send", help="simulate the send button (for testing adapters)")

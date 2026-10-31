@@ -341,6 +341,15 @@ def add_section(root: Path, rel: str, title: str, *, width: float = 900, height:
             "width": fr["width"], "height": fr["height"]}
 
 
+def tidy(root: Path, rel: str) -> dict:
+    from excalibridge import layout
+    path = root / rel
+    scene = read_scene(path)
+    out = layout.tidy(scene)
+    write_scene(path, scene)
+    return out
+
+
 # --------------------------------------------------------------------------- events
 
 

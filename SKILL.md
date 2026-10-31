@@ -45,7 +45,8 @@ Keep replies short. Long reasoning belongs in chat; the canvas points at *where*
 Group a topic with `excalibridge section <file> "title"`. Sections are Excalidraw frames; new
 question cards go into the latest section and the section grows to fit. Sections flow to the right
 and wrap to a new row past the canvas width, so the board does not become one long column. Wrap
-existing content with `--wrap-y y0,y1`.
+existing content with `--wrap-y y0,y1`. Run `excalibridge tidy <file>` when sections touch; it spaces
+them apart and restyles them (pastel backdrop, coloured title).
 
 ## Notation (see references/protocol.md)
 
