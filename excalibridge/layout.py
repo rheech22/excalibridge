@@ -118,14 +118,21 @@ def _section_bg(scene: dict, frame: dict) -> dict | None:
                  and e["customData"].get("section") == frame["id"]), None)
 
 
+# Section look, settled with the first user: accent-coloured dashed outline, no fill, rounded corners.
+def _apply_bg_style(bg: dict, accent: str) -> None:
+    bg.update({"strokeColor": accent, "backgroundColor": "transparent", "fillStyle": "hachure", "strokeWidth": 1,
+               "strokeStyle": "dashed", "roughness": 1, "opacity": 100, "roundness": {"type": 3}})
+    bg["version"] = bg.get("version", 1) + 1
+
+
 def _style_section(scene: dict, frame: dict) -> list[dict]:
     """Ensure the section has a pastel backdrop (behind its members) and a coloured title."""
     if _section_bg(scene, frame) is not None:
         return []
     bg_color, accent = palette(frame["customData"].get("index", 1))
-    bg = core._base("rectangle", frame["x"], frame["y"], frame["width"], frame["height"], strokeColor=accent,
-                    backgroundColor=bg_color, roundness={"type": 3}, strokeWidth=1, opacity=100,
+    bg = core._base("rectangle", frame["x"], frame["y"], frame["width"], frame["height"],
                     customData={"excalibridge": "section-bg", "section": frame["id"]})
+    _apply_bg_style(bg, accent)
     title = core.text_element(frame["name"], frame["x"] + 16, frame["y"] + 12, color=accent, font_size=18)
     title["customData"] = {"excalibridge": "section-title", "section": frame["id"]}
     for e in (bg, title):
@@ -320,4 +327,7 @@ def tidy(scene: dict, gap: float = GAP) -> dict:
             moved += 1
     for f in secs:
         _sync_bg(scene, f)
+        bg = _section_bg(scene, f)
+        if bg is not None:
+            _apply_bg_style(bg, palette(f["customData"].get("index", 1))[1])
     return {"sections": len(secs), "moved": moved, "styled": styled}

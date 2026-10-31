@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.6.1] - 2026-10-31
+
+### Changed
+- Section look: accent-coloured dashed outline with no fill (was a pastel fill). `tidy` restyles
+  existing sections to the current look.
+
 ## [0.6.0] - 2026-10-31
 
 ### Changed
