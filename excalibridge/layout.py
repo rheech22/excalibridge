@@ -183,8 +183,9 @@ def add_section(scene: dict, title: str, *, width: float = 900, height: float = 
     return fr
 
 
-def _grow_section_to_fit(scene: dict, frame: dict | None, needed_bottom: float) -> None:
-    """Grow the frame so `needed_bottom` (+ padding) fits, pushing whatever lies below the frame."""
+def _grow_section_to_fit(scene: dict, frame: dict | None, needed_bottom: float, keep: set[str] = frozenset()) -> None:
+    """Grow the frame so `needed_bottom` (+ padding) fits, pushing whatever lies below the frame.
+    `keep` lists elements that must not be pushed (the block that caused the growth)."""
     if frame is None:
         return
     want = needed_bottom + PAD
@@ -193,7 +194,7 @@ def _grow_section_to_fit(scene: dict, frame: dict | None, needed_bottom: float) 
         dy = want - cur
         bg = _section_bg(scene, frame)
         push_down(scene, cur + 1, frame["x"], frame["x"] + frame["width"], dy,
-                  exclude={frame["id"]} | ({bg["id"]} if bg else set()))
+                  exclude={frame["id"]} | ({bg["id"]} if bg else set()) | set(keep))
         frame["height"] += dy
         frame["version"] = frame.get("version", 1) + 1
         _sync_bg(scene, frame)
@@ -215,7 +216,7 @@ def adopt(scene: dict, frame: dict | None, new_elements: list[dict]) -> None:
         return
     for e in new_elements:
         e["frameId"] = frame["id"]
-    _grow_section_to_fit(scene, frame, max(bounds(e)[3] for e in new_elements))
+    _grow_section_to_fit(scene, frame, max(bounds(e)[3] for e in new_elements), keep={e["id"] for e in new_elements})
 
 
 # ----------------------------------------------------------------------------- replies
@@ -276,7 +277,7 @@ def reply_near(scene: dict, anchor: dict, text: str, *, color: str = core.AGENT_
         e["frameId"] = (card or anchor).get("frameId")
     scene["elements"].extend(new)
     if frame is not None:
-        _grow_section_to_fit(scene, frame, max(bounds(e)[3] for e in new))
+        _grow_section_to_fit(scene, frame, max(bounds(e)[3] for e in new), keep={e["id"] for e in new})
     return new
 
 

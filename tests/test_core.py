@@ -167,6 +167,16 @@ class LayoutTests(unittest.TestCase):
         card = next(e for e in scene["elements"] if e["id"] == q2["id"])
         self.assertEqual(card["frameId"], fr["id"])
 
+    def test_card_that_overflows_section_keeps_its_parts_together(self):
+        core.add_section(self.root, self.rel, "S", width=600, height=80)  # too small on purpose
+        q = core.add_question(self.root, self.rel, "overflow? " * 20)
+        scene = core.read_scene(self.root / self.rel)
+        card = next(e for e in scene["elements"] if e["id"] == q["id"])
+        ans = next(e for e in scene["elements"] if e["id"] == q["answerId"])
+        self.assertLess(ans["y"], card["y"] + card["height"])  # answer line still inside the card
+        fr = next(e for e in scene["elements"] if e["type"] == "frame")
+        self.assertGreaterEqual(fr["y"] + fr["height"], card["y"] + card["height"])
+
     def test_card_reply_grows_card_and_pushes_below(self):
         q = core.add_question(self.root, self.rel, "why?")
         scene = core.read_scene(self.root / self.rel)

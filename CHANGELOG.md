@@ -3,6 +3,12 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.6.2] - 2026-10-31
+
+### Fixed
+- A question card or reply that made its section grow had its own lower parts pushed away from
+  it. The block that causes the growth is now excluded from the push.
+
 ## [0.6.1] - 2026-10-31
 
 ### Changed
