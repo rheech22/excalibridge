@@ -36,4 +36,4 @@ path = "excalibridge/__init__.py"
 packages = ["excalibridge"]
 
 [tool.hatch.build.targets.sdist]
-include = ["excalibridge", "tests", "README.md", "CHANGELOG.md", "LICENSE", "SKILL.md", "references", "herdr-plugin"]
+include = ["excalibridge", "tests", "README.md", "CHANGELOG.md", "LICENSE", "SKILL.md", "references", "herdr-plugin", "examples"]

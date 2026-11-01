@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import math
 import os
 import random
 import string
@@ -12,6 +13,7 @@ import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
+from urllib.parse import quote
 
 HOME = Path(os.environ.get("EXCALIBRIDGE_HOME", Path.home() / ".excalibridge"))
 AGENT_COLOR = "#1971c2"
@@ -136,6 +138,8 @@ def brief(e: dict) -> dict:
     out = {"id": e["id"], "type": e["type"], "x": round(e.get("x", 0)), "y": round(e.get("y", 0))}
     if e.get("text") is not None:
         out["text"] = e["text"]
+    if e.get("type") == "embeddable":
+        out["link"] = e.get("link")
     if e.get("containerId"):
         out["container"] = e["containerId"]
     if e.get("strokeColor"):
@@ -151,6 +155,8 @@ def _signature(e: dict) -> tuple:
            tuple(tuple(round(v) for v in pt) for pt in e.get("points", []) or [])]
     if e.get("type") != "text":  # text boxes auto-resize; their size is not a user edit
         sig += [round(e.get("width", 0)), round(e.get("height", 0))]
+    if e.get("type") == "embeddable":
+        sig += [e.get("link")]
     return tuple(sig)
 
 
@@ -263,6 +269,29 @@ def _base(kind: str, x: float, y: float, w: float, h: float, **extra) -> dict:
           "updated": now_ms, "link": None, "locked": False}
     el.update(extra)
     return el
+
+
+def add_embed(root: Path, rel: str, html: str, *, at: tuple[float, float] | None = None,
+              width: float = 640, height: float = 440) -> dict:
+    """Append a sandboxed project HTML embed; keep its link independent of server port."""
+    root = root.resolve()
+    page = Path(html)
+    page = (page if page.is_absolute() else root / page).resolve()
+    if not page.is_relative_to(root) or page.suffix.lower() not in {".html", ".htm"} or not page.is_file():
+        raise ValueError("embed requires an existing .html/.htm file inside the project root")
+    rel = rel_path(root, rel)
+    if not all(math.isfinite(v) and v > 0 for v in (width, height)):
+        raise ValueError("embed width and height must be finite and positive")
+    scene = read_scene(root / rel) if (root / rel).exists() else empty_scene()
+    x, y = at if at is not None else (0, max((e.get("y", 0) + e.get("height", 0)
+                                             for e in scene["elements"] if not e.get("isDeleted")), default=-40) + 40)
+    if not all(math.isfinite(v) for v in (x, y)):
+        raise ValueError("embed position must be finite")
+    el = _base("embeddable", x, y, width, height,
+               link="/" + quote(page.relative_to(root).as_posix(), safe="/"), roughness=0)
+    scene["elements"].append(el)
+    write_scene(root / rel, scene)
+    return brief(el)
 
 
 def _wrap(text: str, max_chars: int) -> str:

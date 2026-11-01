@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Interactive HTML embed demo</title>
+<style>
+:root { font: 16px system-ui; color-scheme: dark; --bg:#201b25; --fg:#f5e6df; --accent:#ed986c; }
+:root[data-theme=light] { color-scheme:light; --bg:#edf6fa; --fg:#163c50; --accent:#318cae; }
+body { margin:0; padding:32px; min-height:100vh; box-sizing:border-box; background:var(--bg); color:var(--fg); }
+p { line-height:1.6; } button { font:inherit; padding:12px 18px; border:0; border-radius:12px; cursor:pointer; margin:0 8px 12px 0; }
+#swatch { height:90px; background:var(--accent); border-radius:16px; margin:24px 0; }
+small { opacity:.7; }
+</style>
+<h1>HTML inside the canvas</h1>
+<p>Double-click this embed to interact, then try the buttons.</p>
+<button id="theme">Toggle light / dark</button><button id="color">Change accent</button>
+<div id="swatch"></div><p id="state" aria-live="polite">Theme: dark · clicks: 0</p>
+<small>Interaction sample only; these colors are not approved design tokens.</small>
+<script>
+let clicks = 0;
+document.getElementById('theme').onclick = () => {
+  document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  document.getElementById('state').textContent = `Theme: ${document.documentElement.dataset.theme} · clicks: ${++clicks}`;
+};
+document.getElementById('color').onclick = () => {
+  document.getElementById('swatch').style.backgroundColor = ++clicks % 2 ? '#a78bc3' : '#6aa897';
+  document.getElementById('state').textContent = `Theme: ${document.documentElement.dataset.theme || 'dark'} · clicks: ${clicks}`;
+};
+</script></html>

@@ -31,6 +31,7 @@
 <script type="module">
 import React from "react";
 import { createRoot } from "react-dom/client";
+import { localEmbedURL } from "/_excalibridge/embeddable.mjs";
 
 const API = "/_excalibridge/";
 const params = new URLSearchParams(location.search);
@@ -202,6 +203,16 @@ document.addEventListener("keydown", (e) => {
 
 createRoot(document.getElementById("app")).render(React.createElement(Excalidraw, {
   initialData,
+  validateEmbeddable: (link) => localEmbedURL(link, location.origin) ? true : undefined,
+  renderEmbeddable: (element) => {
+    const src = localEmbedURL(element.link, location.origin);
+    if (!src) return null;
+    return React.createElement("iframe", {
+      src, title: "Local HTML prototype", className: "excalidraw__embeddable",
+      sandbox: "allow-scripts", referrerPolicy: "no-referrer",
+      style: { width: "100%", height: "100%", border: 0 },
+    });
+  },
   renderTopRightUI: () => React.createElement(TopRightUI),
   excalidrawAPI: (a) => { api = a; window.excalidrawAPI = a; savedSnapshot = snap(initialData.elements || []); document.title = "excalibridge · " + file; refreshMtime(); refreshServerPending(); },
   onChange: () => { if (!api) return; const n = window.unsavedChanges().count; if (n > 0) scheduleAutosave(); renderSendState(); },

@@ -3,6 +3,18 @@
 All notable changes to this project are documented here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses [SemVer](https://semver.org).
 
+## [0.7.0] - 2026-11-01
+
+### Added
+- Interactive project HTML and local development server embeds in the canvas, rendered in
+  script-enabled sandboxed iframes without access to the parent DOM.
+- `excalibridge embed <canvas> <html>` appends a project HTML page without replacing existing
+  canvas content. Embed links are preserved on save and included in agent change detection.
+- A runnable HTML/canvas example and tests for embed paths, URL policy, and server delivery.
+
+### Fixed
+- Static project serving now rejects symlinks that escape the project root.
+
 ## [0.6.2] - 2026-10-31
 
 ### Fixed

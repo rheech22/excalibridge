@@ -126,6 +126,14 @@ def cmd_changes(args):
     _print(core.changes_since_seen(cfg.root, core.rel_path(cfg.root, args.file), cfg.labels))
 
 
+def cmd_embed(args):
+    cfg = _cfg(args)
+    at = tuple(float(v) for v in args.at.split(",")) if args.at else None
+    if at is not None and len(at) != 2:
+        raise ValueError("--at requires x,y")
+    _print(core.add_embed(cfg.root, args.file, args.html, at=at, width=args.width, height=args.height))
+
+
 def cmd_ask(args):
     cfg = _cfg(args)
     rel = core.rel_path(cfg.root, args.file)
@@ -236,6 +244,12 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("open", help="start the server if needed and open a canvas in the browser")
     s.add_argument("file"); s.add_argument("--no-browser", action="store_true"); s.set_defaults(fn=cmd_open)
+
+    s = sub.add_parser("embed", help="append an interactive project HTML page to a canvas")
+    s.add_argument("file"); s.add_argument("html", help="existing project HTML path (not HTML source)")
+    s.add_argument("--at", help="x,y; default: below existing content")
+    s.add_argument("--width", type=float, default=640); s.add_argument("--height", type=float, default=440)
+    s.set_defaults(fn=cmd_embed)
 
     s = sub.add_parser("new", help="create an empty .excalidraw file")
     s.add_argument("file"); s.add_argument("--force", action="store_true"); s.set_defaults(fn=cmd_new)

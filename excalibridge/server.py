@@ -31,6 +31,14 @@ def make_handler(cfg: core.ProjectConfig):
         def __init__(self, *a, **k):
             super().__init__(*a, directory=str(root), **k)
 
+        def send_head(self):
+            # SimpleHTTPRequestHandler follows symlinks; project content must stay in root.
+            target = Path(self.translate_path(self.path)).resolve()
+            if not target.is_relative_to(root.resolve()):
+                self.send_error(403, "outside the project root")
+                return None
+            return super().send_head()
+
         # -- helpers
         def _json(self, obj, code=200):
             data = json.dumps(obj, ensure_ascii=False).encode()
@@ -63,6 +71,13 @@ def make_handler(cfg: core.ProjectConfig):
             if not u.path.startswith(PREFIX):
                 return super().do_GET()
             op = u.path[len(PREFIX):]
+            if op == "embeddable.mjs":
+                data = (VIEWER.parent / "embeddable.mjs").read_bytes()
+                self.send_response(200)
+                self.send_header("Content-Type", "text/javascript; charset=utf-8")
+                self.send_header("Content-Length", str(len(data)))
+                self.end_headers()
+                return self.wfile.write(data)
             if op == "viewer":
                 html = VIEWER.read_bytes()
                 self.send_response(200)
